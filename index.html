@@ -41,24 +41,33 @@
       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
     // ĐƯỜNG DẪN FILE PDF CỦA BẠN
-    const pdfUrl = "sach-demo.pdf"; // 👉 đổi tên nếu file PDF khác tên
+    const pdfUrl = "book.pdf"; // 👉 đổi tên nếu file PDF của bạn khác tên
 
     const $flipbook = $("#flipbook");
     let pdfTotalPages = 0;
 
-    // Tính kích thước sách theo màn hình (đặc biệt cho điện thoại nằm ngang)
+    // Tính kích thước sách theo màn hình (ưu tiên cho điện thoại nằm ngang)
     function getBookSize() {
-      const BASE_WIDTH = 1000;
-      const BASE_HEIGHT = 600;
+      // Tỷ lệ gốc của sách (2 trang): 1000 x 600
+      const RATIO = 1000 / 600;
 
-      const availW = window.innerWidth * 0.98; // chừa 1 ít mép
-      const availH = window.innerHeight * 0.7; // chừa chỗ cho thanh điều khiển
+      // Dùng gần như full màn hình
+      let availW = window.innerWidth * 0.98;  // 98% chiều rộng
+      let availH = window.innerHeight * 0.9;  // 90% chiều cao (để chừa chỗ cho thanh điều khiển)
 
-      let scale = Math.min(availW / BASE_WIDTH, availH / BASE_HEIGHT, 1);
+      // Ưu tiên dùng hết chiều rộng trước
+      let width = availW;
+      let height = width / RATIO;
+
+      // Nếu cao hơn chiều cao cho phép thì thu bớt lại theo chiều cao
+      if (height > availH) {
+        height = availH;
+        width = height * RATIO;
+      }
 
       return {
-        width: Math.round(BASE_WIDTH * scale),
-        height: Math.round(BASE_HEIGHT * scale),
+        width: Math.round(width),
+        height: Math.round(height),
       };
     }
 
@@ -85,14 +94,13 @@
 
     // Khởi tạo flipbook
     function initFlipbook() {
+      const size = getBookSize();
+
       if ($flipbook.data("initialized")) {
         // Nếu đã init rồi -> chỉ resize lại
-        const size = getBookSize();
         $flipbook.turn("size", size.width, size.height);
         return;
       }
-
-      const size = getBookSize();
 
       $flipbook.turn({
         width: size.width,
@@ -110,6 +118,9 @@
       });
 
       $flipbook.data("initialized", true);
+
+      // Lúc mới vào, cập nhật luôn số trang (đang ở page 3)
+      updateCurrentPage(3);
 
       // Resize khi xoay ngang/đổi kích thước màn hình
       window.addEventListener("resize", function () {
