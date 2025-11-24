@@ -154,7 +154,7 @@ body {
     box-shadow: none;
 }
 
-/* Responsive nhỏ hơn (phòng khi bạn xem dọc hoặc màn hình nhỏ) */
+/* Responsive nhỏ hơn (phòng khi xem dọc hoặc màn nhỏ) */
 @media (max-width: 768px) {
     body {
         overflow: auto;
