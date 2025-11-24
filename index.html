@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css" />
+  <title>Flipbook PDF - Mắt biếc</title>
+</head>
+
+<body>
+  <div class="book-container">
+    <!-- Flipbook -->
+    <div id="flipbook" class="flipbook"></div>
+
+    <!-- Thanh điều khiển -->
+    <div class="book-controls">
+      <span>Trang: <span id="current-page">1</span>/<span id="total-pages">0</span></span>
+
+      <div class="goto-box">
+        <input
+          type="number"
+          id="goto-page"
+          min="1"
+          placeholder="Nhập số trang..."
+        />
+        <button id="btn-goto">Tới trang</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- jQuery và Turn.js (file bạn đã có sẵn) -->
+  <script src="jquery.js"></script>
+  <script src="turn.js"></script>
+
+  <!-- PDF.js từ CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    // Cấu hình worker của PDF.js
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+    // ĐƯỜNG DẪN FILE PDF CỦA BẠN
+    const pdfUrl = "sach-demo.pdf"; // 👉 đổi tên nếu file PDF khác tên
+
+    const $flipbook = $("#flipbook");
+    let pdfTotalPages = 0;
+
+    // Tính kích thước sách theo màn hình (đặc biệt cho điện thoại nằm ngang)
+    function getBookSize() {
+      const BASE_WIDTH = 1000;
+      const BASE_HEIGHT = 600;
+
+      const availW = window.innerWidth * 0.98; // chừa 1 ít mép
+      const availH = window.innerHeight * 0.7; // chừa chỗ cho thanh điều khiển
+
+      let scale = Math.min(availW / BASE_WIDTH, availH / BASE_HEIGHT, 1);
+
+      return {
+        width: Math.round(BASE_WIDTH * scale),
+        height: Math.round(BASE_HEIGHT * scale),
+      };
+    }
+
+    // Cập nhật số trang đang xem (từ page của turn.js → page PDF)
+    function updateCurrentPage(turnPage) {
+      if (!pdfTotalPages) return;
+
+      // Cấu trúc:
+      // 1: bìa cứng
+      // 2: mặt trong bìa
+      // 3..(pdfTotalPages+2): trang PDF
+      // ... cuối: bìa sau
+      let pdfPage;
+      if (turnPage <= 2) {
+        pdfPage = 1;
+      } else if (turnPage >= pdfTotalPages + 3) {
+        pdfPage = pdfTotalPages;
+      } else {
+        pdfPage = turnPage - 2;
+      }
+
+      document.getElementById("current-page").textContent = pdfPage;
+    }
+
+    // Khởi tạo flipbook
+    function initFlipbook() {
+      if ($flipbook.data("initialized")) {
+        // Nếu đã init rồi -> chỉ resize lại
+        const size = getBookSize();
+        $flipbook.turn("size", size.width, size.height);
+        return;
+      }
+
+      const size = getBookSize();
+
+      $flipbook.turn({
+        width: size.width,
+        height: size.height,
+        autoCenter: true,
+        elevation: 50,
+        gradients: true,
+        display: "double",
+        page: 3, // mở ở trang nội dung đầu tiên
+      });
+
+      // Khi lật trang xong
+      $flipbook.bind("turned", function (e, page) {
+        updateCurrentPage(page);
+      });
+
+      $flipbook.data("initialized", true);
+
+      // Resize khi xoay ngang/đổi kích thước màn hình
+      window.addEventListener("resize", function () {
+        if ($flipbook.data("initialized")) {
+          const s = getBookSize();
+          $flipbook.turn("size", s.width, s.height);
+        }
+      });
+    }
+
+    // Tính năng "tới trang"
+    function setupGoto() {
+      const input = document.getElementById("goto-page");
+      const btn = document.getElementById("btn-goto");
+
+      function goToPage() {
+        if (!pdfTotalPages || !$flipbook.data("initialized")) return;
+
+        let val = parseInt(input.value, 10);
+        if (isNaN(val)) return;
+
+        if (val < 1) val = 1;
+        if (val > pdfTotalPages) val = pdfTotalPages;
+
+        // map: pdfPage -> turnPage
+        const turnPage = val + 2;
+        $flipbook.turn("page", turnPage);
+      }
+
+      btn.addEventListener("click", goToPage);
+      input.addEventListener("keyup", function (e) {
+        if (e.key === "Enter") {
+          goToPage();
+        }
+      });
+    }
+
+    setupGoto();
+
+    // Tải PDF
+    const loadingTask = pdfjsLib.getDocument(pdfUrl);
+    loadingTask.promise
+      .then(function (pdf) {
+        pdfTotalPages = pdf.numPages;
+        document.getElementById("total-pages").textContent = pdfTotalPages;
+
+        const totalPages = pdf.numPages;
+        let pagesRendered = 0;
+
+        // Bìa đầu
+        $flipbook.append(`
+        <div class="hard">
+          Mắt biếc
+          <small>Nguyễn Nhật Ánh</small>
+        </div>
+      `);
+        // Mặt trong bìa
+        $flipbook.append(`<div class="hard"></div>`);
+
+        // Tạo khung trống cho mỗi trang PDF
+        const pageDivs = [];
+        for (let i = 1; i <= totalPages; i++) {
+          const pageDiv = document.createElement("div");
+          pageDiv.classList.add("page");
+          pageDiv.setAttribute("data-page", i);
+          $flipbook.append(pageDiv);
+          pageDivs[i] = pageDiv;
+        }
+
+        // Render từng trang PDF
+        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+          pdf.getPage(pageNum).then(function (page) {
+            const scale = 1.5;
+            const viewport = page.getViewport({ scale: scale });
+
+            const canvas = document.createElement("canvas");
+            const context = canvas.getContext("2d");
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+
+            canvas.style.width = "100%";
+            canvas.style.height = "auto";
+            canvas.style.display = "block";
+
+            const renderContext = {
+              canvasContext: context,
+              viewport: viewport,
+            };
+
+            page.render(renderContext).promise.then(function () {
+              const container = pageDivs[page.pageNumber];
+              if (container) {
+                container.innerHTML = "";
+
+                const inner = document.createElement("div");
+                inner.classList.add("page-inner");
+                inner.appendChild(canvas);
+
+                container.appendChild(inner);
+              }
+
+              pagesRendered++;
+
+              if (pagesRendered === totalPages) {
+                // Bìa sau
+                $flipbook.append(`<div class="hard"></div>`);
+                $flipbook.append(`
+                <div class="hard">
+                  Hết sách
+                  <small>~ Flipbook PDF</small>
+                </div>
+              `);
+
+                // Khởi động flipbook (sau khi có đủ trang)
+                initFlipbook();
+              }
+            });
+          });
+        }
+      })
+      .catch(function (err) {
+        console.error("Lỗi khi load PDF:", err);
+        alert(
+          "Không tải được file PDF. Hãy kiểm tra lại tên file và đường dẫn (pdfUrl)."
+        );
+      });
+  </script>
+</body>
+
+</html>
