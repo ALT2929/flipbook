@@ -30,6 +30,7 @@
   </div>
 
   <!-- jQuery và Turn.js (file bạn đã có sẵn) -->
+  <!-- jQuery và Turn.js (file bạn đã có sẵn) -->
   <script src="jquery.js"></script>
   <script src="turn.js"></script>
 
@@ -168,15 +169,14 @@
         document.getElementById("total-pages").textContent = pdfTotalPages;
 
         const totalPages = pdf.numPages;
-        let pagesRendered = 0;
 
         // Bìa đầu
         $flipbook.append(`
-        <div class="hard">
-          Mắt biếc
-          <small>Nguyễn Nhật Ánh</small>
-        </div>
-      `);
+          <div class="hard">
+            Mắt biếc
+            <small>Nguyễn Nhật Ánh</small>
+          </div>
+        `);
         // Mặt trong bìa
         $flipbook.append(`<div class="hard"></div>`);
 
@@ -190,7 +190,19 @@
           pageDivs[i] = pageDiv;
         }
 
-        // Render từng trang PDF
+        // Bìa sau (thêm luôn, KHÔNG chờ render)
+        $flipbook.append(`<div class="hard"></div>`);
+        $flipbook.append(`
+          <div class="hard">
+            Hết sách
+            <small>~ Flipbook PDF</small>
+          </div>
+        `);
+
+        // 👉 Khởi động flipbook NGAY sau khi có đủ khung trang
+        initFlipbook();
+
+        // Render từng trang PDF (nội dung) – KHÔNG chặn init
         for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
           pdf.getPage(pageNum).then(function (page) {
             const scale = 1.5;
@@ -221,23 +233,11 @@
 
                 container.appendChild(inner);
               }
-
-              pagesRendered++;
-
-              if (pagesRendered === totalPages) {
-                // Bìa sau
-                $flipbook.append(`<div class="hard"></div>`);
-                $flipbook.append(`
-                <div class="hard">
-                  Hết sách
-                  <small>~ Flipbook PDF</small>
-                </div>
-              `);
-
-                // Khởi động flipbook (sau khi có đủ trang)
-                initFlipbook();
-              }
+            }).catch(function (err) {
+              console.error("Lỗi render trang PDF:", page.pageNumber, err);
             });
+          }).catch(function (err) {
+            console.error("Lỗi lấy trang PDF:", pageNum, err);
           });
         }
       })
@@ -248,7 +248,9 @@
         );
       });
   </script>
+
 </body>
 
 </html>
+
 
